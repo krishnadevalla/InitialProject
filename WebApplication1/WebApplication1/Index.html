@@ -1,0 +1,207 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+    <title>BackboneJS</title>
+    <link href="css/boot.css" rel="stylesheet" />
+</head>
+<body style="background-color:orange;color:white">
+    <!--
+    <form id="form1">
+    <div>
+    <p id="pp">Here</p>
+     <a class="btn-primary btn" id="but" href="" >click</a>
+    </div>
+    </form>-->
+    <script src="scripts/jquery-1.12.0.js"></script>
+    <script src="scripts/underscore.js"></script>
+
+    <script src="scripts/backbone.js"></script>
+    <center>
+        <div class="container">
+            <h1>Users List</h1>
+            <hr />
+            <table>
+                <tr>
+                    <td>
+                        <div class="page">
+
+                        </div>
+                    </td>
+                    <td>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    </td>
+                    <td>
+                        <div style="position:absolute;top:90px" class="right"></div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <script type="text/template" id="user-list-template">
+                <a href="#/new" class="btn btn-primary">New</a>
+                <hr />
+                <table class="table striped">
+                    <thead>
+                        <tr>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Age</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% _.each(users, function(user) { %>
+                        <tr>
+                            <td><%= htmlEncode(user.get('firstname')) %></td>
+                            <td><%= htmlEncode(user.get('lastname')) %></td>
+                            <td><%= htmlEncode(user.get('age')) %></td>
+                            <td><a class="btn" href="#/edit/<%= user.id %>">Edit</a></td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </script>
+        <script type="text/template" id="edit-user-template">
+            <form style="color:black" class="edit-user-form">
+                <legend><%= user ? 'Edit' : 'New' %> User</legend>
+                <label>First Name</label><br />
+                <input name="firstname" type="text" value="<%= user ? user.get('firstname') : '' %>"><br />
+                <label>Last Name</label><br />
+                <input name="lastname" type="text" value="<%= user ? user.get('lastname') : '' %>"><br />
+                <label>Age</label><br />
+                <input name="age" type="text" value="<%= user ? user.get('age') : '' %>"><br />
+                <hr />
+                <button type="submit" class="btn"><%= user ? 'Update' : 'Create' %></button>
+                <% if(user) { %>
+                <input type="hidden" name="id" value="<%= user.id %>" />
+                <button data-user-id="<%= user.id %>" class="btn btn-danger delete">Delete</button>
+                <% }; %>
+            </form>
+        </script>
+    </center> 
+
+    <script>
+    function htmlEncode(value){
+        return $('<div/>').text(value).html();
+    }
+        $.fn.serializeObject = function() {
+            var o = {};
+            var a = this.serializeArray();
+            $.each(a, function() {
+                if (o[this.name] !== undefined) {
+                    if (!o[this.name].push) {
+                        o[this.name] = [o[this.name]];
+                    }
+                    o[this.name].push(this.value || '');
+                } else {
+                    o[this.name] = this.value || '';
+                }
+            });
+            return o;
+        };
+
+        $.ajaxPrefilter( function( options, originalOptions, jqXHR ) { 
+            options.url = 'http://backbone-beginner.herokuapp.com' + options.url; 
+        }); 
+
+//Collections//////////////////////////////////
+        var Users = Backbone.Collection.extend({
+            url: '/users'
+        });
+//Collections End//////////////////////////////
+        var User = Backbone.Model.extend({
+            urlRoot: '/users'
+        });
+//Views////////////////////////////////////////
+        var UserListView = Backbone.View.extend({ 
+          el: '.page', 
+          render: function () { 
+                     var that = this; 
+                     var users = new Users(); 
+                     users.fetch({ 
+                       success: function (users) { 
+                         var template = _.template($('#user-list-template').html(), {users: users.models}); 
+                         that.$el.html(template); 
+                       } 
+                     }) 
+       } 
+        });
+        var UserEditView = Backbone.View.extend({
+            el: '.right',
+            events: {
+                'submit .edit-user-form': 'saveUser',
+                'click .delete': 'deleteUser'
+            },
+            saveUser: function (ev) {
+                var userDetails = $(ev.currentTarget).serializeObject();
+                var user = new User();
+                user.save(userDetails, {
+                    success: function (user) {
+                        router.navigate('', { trigger: true });
+                    }
+                });
+                return false;
+            },
+            deleteUser: function (ev) {
+                this.user.destroy({
+                    success: function () {
+                        console.log('destroyed');
+                        router.navigate('', { trigger: true });
+                    }
+                });
+                return false;
+            },
+            render: function (options) {
+                var that = this;
+                if (options.id) {
+                    that.user = new User({ id: options.id });
+                    that.user.fetch({
+                        success: function (user) {
+                            var template = _.template($('#edit-user-template').html(), { user: user });
+                            that.$el.html(template);
+                        }
+                    })
+                } else {
+                    var template = _.template($('#edit-user-template').html(), { user: null });
+                    that.$el.html(template);
+                }
+            }
+        });
+
+        var userEditView = new UserEditView();
+        var userList = new UserListView();
+//Views End////////////////////////////////////
+
+//Routes///////////////////////////////////////
+    var Router = Backbone.Router.extend({ 
+        routes: { 
+            "": "home",
+            "edit/:id": "edit",
+            "new": "edit",
+        } 
+        }); 
+
+    var router = new Router();
+    router.on('route:home', function () {
+        userList.render();
+    })
+    router.on('route:edit', function (id) {
+        userEditView.render({id: id});
+    })
+    Backbone.history.start();
+//Routes Ends///////////////////////////////////
+    </script>
+    <!-- // Jquery
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#but').click(function () {
+                if($('#pp').html()=='Here')
+                 {
+                     alert("Here");
+                 }
+            });
+        });
+    </script> -->
+</body>
+</html>
